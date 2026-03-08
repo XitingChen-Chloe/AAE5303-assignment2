@@ -358,6 +358,15 @@ Rotation drift rate:        137.8087 deg/100m
 ================================================================================
 ```
 
+### Trajectory Alignment Statistics
+
+| Parameter | Value |
+|-----------|-------|
+| **Sim(3) scale correction** | 0.2447 |
+| **Sim(3) translation** | [-6.910, -50.528, 27.012] m |
+| **Association threshold** | \(t_{max\_diff}\) = 0.1 s |
+| **Association rate (Completeness)** | 95.35% |
+
 ### Performance Analysis
 
 | Metric | Value | Grade | Interpretation |
