@@ -120,14 +120,20 @@ $$ATE_{RMSE} = \sqrt{\frac{1}{N}\sum_{i=1}^{N}\|\mathbf{p}_{est}^i - \mathbf{p}_
 
 #### 2. RPE (Relative Pose Error) – Drift Rates
 
-Measures local consistency by comparing relative transformations. We report drift as **rates**:
+Measures local consistency by comparing relative transformations:
 
-- **Translation drift rate** (m/m): \(\text{RPE}_{trans,mean} / \Delta d\)
-- **Rotation drift rate** (deg/100m): \((\text{RPE}_{rot,mean} / \Delta d) \times 100\)
+$$RPE_{trans} = \|\Delta\mathbf{p}_{est} - \Delta\mathbf{p}_{gt}\|$$
 
-where \(\Delta d = 10\) m.
+where $\Delta\mathbf{p} = \mathbf{p}(t+\Delta) - \mathbf{p}(t)$
 
 **Reference**: Geiger et al., "Vision meets Robotics: The KITTI Dataset", IJRR 2013
+
+We report drift as **rates** that are easier to interpret and compare across methods:
+
+- **Translation drift rate** (m/m): \( \text{RPE}_{trans,mean} / \Delta d \)
+- **Rotation drift rate** (deg/100m): \( (\text{RPE}_{rot,mean} / \Delta d) \times 100 \)
+
+where \(\Delta d\) is a distance interval in meters (e.g., 10 m).
 
 #### 3. Completeness
 
