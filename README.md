@@ -292,6 +292,7 @@ Camera1.k3: -0.0627
 Camera.width: 612
 Camera.height: 512
 Camera.fps: 10.0
+Camera.RGB: 1
 ```
 
 Intrinsics scaled by 1/4 from original 2448×2048 calibration.
