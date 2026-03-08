@@ -1,0 +1,86 @@
+================================================================================
+ORB_SLAM3 TRAJECTORY EVALUATION - HKisland_GNSS03 Dataset
+================================================================================
+Report updated: Based on CameraTrajectory.txt (full trajectory) evaluation
+Configuration: 4x image downsampling, 0.5x bag playback
+
+DATASET INFORMATION:
+- Duration: 390 seconds (6.5 minutes)
+- Ground Truth Poses: 1955 (RTK)
+- Estimated Poses: 3704 (full camera trajectory, all frames)
+- Matched Poses: 1864 (95.35% of ground truth)
+- Completeness: 95.35%
+
+NOTE: Using full CameraTrajectory (all tracked frames) significantly improves
+pose alignment compared to KeyFrameTrajectory. 95.35% completeness indicates
+most ground-truth timestamps can be associated with estimated poses.
+
+--------------------------------------------------------------------------------
+ABSOLUTE TRAJECTORY ERROR (ATE)
+--------------------------------------------------------------------------------
+Method: Sim(3) Umeyama alignment with scale correction
+Reference: Ground truth from RTK GPS
+Association: t_max_diff = 0.1 s
+
+  RMSE:        99.4754 m
+  Mean:        62.1541 m
+  Std Dev:     77.6674 m
+
+--------------------------------------------------------------------------------
+RELATIVE POSE ERROR (RPE)
+--------------------------------------------------------------------------------
+Method: Distance-based (delta = 10 m)
+Alignment: Sim(3) Umeyama with scale correction
+
+  Translation drift rate:     4.8153 m/m
+  Translation mean over 10m:  48.1534 m
+  Translation RMSE:           276.8758 m
+
+  Rotation drift rate:        137.8087 deg/100m
+  Rotation mean over 10m:     13.7809 deg
+  Rotation RMSE:              25.9965 deg
+
+--------------------------------------------------------------------------------
+EVALUATION PARAMETERS
+--------------------------------------------------------------------------------
+  t_max_diff:  0.1 s (timestamp association threshold)
+  delta:       10 m (distance interval for RPE)
+
+--------------------------------------------------------------------------------
+PERFORMANCE ASSESSMENT
+--------------------------------------------------------------------------------
+
+ATE RMSE 99.48m:    POOR
+- Large global trajectory error after Sim(3) alignment
+- May indicate scale/rotation drift over long UAV trajectory
+- 4x downsampling reduces resolution; consider tuning for this scenario
+
+Completeness 95.35%: EXCELLENT
+- High pose alignment rate (1864/1955)
+- Full trajectory provides dense temporal coverage
+- Much improved over keyframe-only evaluation (~45%)
+
+RPE Translation drift 4.82 m/m:   POOR
+- High local drift per traveled distance
+- Suggests accumulated error along trajectory
+
+RPE Rotation drift 137.81 deg/100m: POOR
+- Significant orientation drift
+- Typical for monocular VO without loop closure on long sequences
+
+Overall: MIXED
+- Completeness is excellent (full trajectory evaluation)
+- Accuracy metrics indicate substantial drift on this challenging
+  UAV aerial sequence (~1.9 km, 6.5 min)
+- Recommendations: verify camera calibration for downsampled config,
+  consider stereo/IMU fusion, or shorter evaluation segments
+
+--------------------------------------------------------------------------------
+INPUT FILES
+--------------------------------------------------------------------------------
+  Ground truth:    ground_truth.txt
+  Estimated:      CameraTrajectory.txt
+  Metrics JSON:   evaluation_results/metrics.json
+  Figures:        figures/trajectory_evaluation.png
+
+================================================================================
