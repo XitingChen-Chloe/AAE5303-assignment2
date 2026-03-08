@@ -392,12 +392,13 @@ Rotation drift rate:        137.8087 deg/100m
 
 ![Trajectory Evaluation](figures/trajectory_evaluation.png)
 
-This figure includes:
+This figure is generated from the same inputs used for evaluation (`ground_truth.txt` and `CameraTrajectory.txt`) and includes:
 
-1. **Top-Left**: 2D trajectory before alignment (matched poses only)
-2. **Top-Right**: 2D trajectory after Sim(3) alignment (scale corrected)
-3. **Bottom-Left**: Distribution of ATE translation errors (meters)
-4. **Bottom-Right**: ATE translation error along trajectory
+1. **Top-Left**: 2D trajectory before alignment (matched poses only). This reveals scale/rotation mismatch typical for monocular VO.
+2. **Top-Right**: 2D trajectory after Sim(3) alignment (scale corrected). Remaining discrepancy reflects drift and local tracking errors.
+3. **Bottom-Left**: Distribution of ATE translation errors (meters) over all matched poses.
+4. **Bottom-Right**: ATE translation error as a function of the matched pose index (highlights where drift accumulates).
+
 
 **Reproducibility**: Regenerate with `scripts/generate_report_figures.py` and `evo_ape --save_results`.
 
