@@ -368,8 +368,6 @@ This assignment demonstrates monocular Visual Odometry implementation using ORB-
 
 5. ORB-SLAM3 GitHub: https://github.com/UZ-SLAMLab/ORB_SLAM3
 
-6. AAE5303 Assignment Template: https://github.com/XitingChen-Chloe/AAE5303-assignment2/blob/main/README.md
-
 ---
 
 ## 📎 Appendix
