@@ -137,18 +137,94 @@ where \(\Delta d\) is a distance interval in meters (e.g., 10 m).
 
 #### 3. Completeness
 
+Completeness measures how many ground-truth poses can be associated and evaluated:
+
 $$Completeness = \frac{N_{matched}}{N_{gt}} \times 100\%$$
 
-#### Why Sim(3) alignment?
+#### Why these metrics (and why Sim(3) alignment)?
 
-Monocular VO suffers from **scale ambiguity**. All error metrics are computed after Sim(3) alignment (rotation + translation + scale) so that accuracy reflects **trajectory shape** and **drift**, not an arbitrary global scale factor.
+Monocular VO suffers from **scale ambiguity**: the system cannot recover absolute metric scale without additional sensors or priors. Therefore:
 
-### Evaluation Protocol
+- **All error metrics are computed after Sim(3) alignment** (rotation + translation + scale) so that accuracy reflects **trajectory shape** and **drift**, not an arbitrary global scale factor.
+- **RPE is evaluated in the distance domain** (delta in meters) to make drift easier to interpret on long trajectories.
+- **Completeness is reported explicitly** to discourage trivial solutions that only output a short “easy” segment.
 
-- **Ground truth**: `ground_truth.txt` (TUM format)
-- **Estimated trajectory**: `CameraTrajectory.txt` (full trajectory, all frames)
-- **Association threshold**: \(t_{max\_diff} = 0.1\) s
-- **Distance delta for RPE**: \(\delta = 10\) m
+### Trajectory Alignment
+
+We use Sim(3) (7-DOF) alignment to optimally align estimated trajectory to ground truth:
+
+- **3-DOF Translation**: Align trajectory origins
+- **3-DOF Rotation**: Align trajectory orientations
+- **1-DOF Scale**: Compensate for monocular scale ambiguity
+
+### Evaluation Protocol (Recommended)
+
+This section describes the **exact** evaluation protocol used in this report. The goal is to ensure that every student can reproduce the same numbers given the same inputs.
+
+#### Inputs
+
+- **Ground truth**: `ground_truth.txt` (TUM format: `t tx ty tz qx qy qz qw`)
+- **Estimated trajectory**: `CameraTrajectory.txt` (TUM format)
+- **Association threshold**: `t_max_diff = 0.1 s`
+  - This dataset contains RTK at ~5 Hz and images at ~10 Hz.
+  - A threshold of 0.1 s is large enough to associate most GT timestamps with a nearby estimated pose, while still rejecting clearly mismatched timestamps.
+- **Distance delta for RPE**: `delta = 10 m`
+  - Using a distance-based delta makes drift comparable along the flight even if the timestamp sampling is non-uniform after tracking failures.
+
+#### Step 1 — ATE with Sim(3) alignment (scale corrected)
+
+```bash
+evo_ape tum ground_truth.txt CameraTrajectory.txt \
+  --align --correct_scale \
+  --t_max_diff 0.1 -va
+```
+
+We report **ATE RMSE (m)** as the primary global accuracy metric.
+
+#### Step 2 — RPE (translation + rotation) in the distance domain
+
+```bash
+# Translation RPE over 10 m (meters)
+evo_rpe tum ground_truth.txt CameraTrajectory.txt \
+  --align --correct_scale \
+  --t_max_diff 0.1 \
+  --delta 10 --delta_unit m \
+  --pose_relation trans_part -va
+
+# Rotation RPE over 10 m (degrees)
+evo_rpe tum ground_truth.txt CameraTrajectory.txt \
+  --align --correct_scale \
+  --t_max_diff 0.1 \
+  --delta 10 --delta_unit m \
+  --pose_relation angle_deg -va
+```
+
+We convert evo’s mean RPE over 10 m into drift rates:
+
+- **RPE translation drift (m/m)** = `RPE_trans_mean_m / 10`
+- **RPE rotation drift (deg/100m)** = `(RPE_rot_mean_deg / 10) * 100`
+
+#### Step 3 — Completeness
+
+Completeness measures how much of the sequence can be evaluated:
+
+```text
+Completeness (%) = matched_poses / gt_poses * 100
+```
+
+Here, `matched_poses` is the number of pose pairs successfully associated by evo under `t_max_diff`.
+
+#### Practical Notes (Common Pitfalls)
+
+- **Use the correct trajectory file**:
+  - `CameraTrajectory.txt` contains *all tracked frames* and typically yields higher completeness.
+  - `KeyFrameTrajectory.txt` contains only keyframes and can severely reduce completeness and distort drift estimates.
+- **Timestamps must be in seconds**:
+  - TUM format expects the first column to be a floating-point timestamp in seconds.
+  - If you accidentally write frame indices as timestamps, `evo` will fail to associate trajectories.
+- **Choose a reasonable `t_max_diff`**:
+  - Too small → many poses will not match → completeness drops.
+  - Too large → wrong matches may slip in → metrics become unreliable.
 
 ---
 
