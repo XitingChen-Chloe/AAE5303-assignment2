@@ -391,6 +391,7 @@ AAE5303_assignment2_orbslam3_demo/
 │   └── generate_report_figures.py
 └── docs/
     └── camera_config.yaml       # 2× downsampled HKisland config
+    └── HKisland_Mono.yaml
 ```
 
 ### B. Running Commands
