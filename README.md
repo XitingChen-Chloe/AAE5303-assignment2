@@ -423,13 +423,11 @@ EOF
 # 2. Run ORB-SLAM3 (see Implementation Details for full steps)
 # Terminal 1: roscore
 source /opt/ros/noetic/setup.bash && roscore
-
 # Terminal 2: ORB-SLAM3 with 2× downsampling
 ./Examples_old/ROS/ORB_SLAM3/Mono_Compressed \
     Vocabulary/ORBvoc.txt \
     Examples/Monocular/HKisland_Mono_downsampled2.yaml \
     2
-
 # Terminal 3: Play bag at 0.5× speed
 rosbag play --pause --rate 0.5 data/HKisland_GNSS03.bag \
     /left_camera/image/compressed:=/camera/image_raw/compressed
