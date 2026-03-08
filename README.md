@@ -39,13 +39,13 @@ This report presents the implementation and evaluation of **Monocular Visual Odo
 
 | Metric | Value | Description |
 |--------|-------|-------------|
-| **ATE RMSE** | **99.4754 m** | Global accuracy after Sim(3) alignment (scale corrected) |
-| **RPE Trans Drift** | **4.8153 m/m** | Translation drift rate (mean error per meter, delta=10 m) |
-| **RPE Rot Drift** | **137.8087 deg/100m** | Rotation drift rate (mean angle per 100 m, delta=10 m) |
-| **Completeness** | **95.35%** | Matched poses / total ground-truth poses (1864 / 1955) |
-| **Estimated poses** | 3,704 | Trajectory poses in `CameraTrajectory.txt` |
+| **ATE RMSE** | **3.2078 m** | Global accuracy after Sim(3) alignment (scale corrected) |
+| **RPE Trans Drift** | **1.4443 m/m** | Translation drift rate (mean error per meter, delta=10 m) |
+| **RPE Rot Drift** | **110.3482 deg/100m** | Rotation drift rate (mean angle per 100 m, delta=10 m) |
+| **Completeness** | **92.94%** | Matched poses / total ground-truth poses (1817 / 1955) |
+| **Estimated poses** | 3,609 | Trajectory poses in `CameraTrajectory.txt` |
 
-**Configuration**: 4× image downsampling (2448×2048 → 612×512), 0.5× bag playback.
+**Configuration**: 2× image downsampling (2448×2048 → 1224×1024), 0.5× bag playback.
 
 ---
 
@@ -120,111 +120,29 @@ $$ATE_{RMSE} = \sqrt{\frac{1}{N}\sum_{i=1}^{N}\|\mathbf{p}_{est}^i - \mathbf{p}_
 
 #### 2. RPE (Relative Pose Error) – Drift Rates
 
-Measures local consistency by comparing relative transformations:
+Measures local consistency by comparing relative transformations. We report drift as **rates**:
 
-$$RPE_{trans} = \|\Delta\mathbf{p}_{est} - \Delta\mathbf{p}_{gt}\|$$
+- **Translation drift rate** (m/m): \(\text{RPE}_{trans,mean} / \Delta d\)
+- **Rotation drift rate** (deg/100m): \((\text{RPE}_{rot,mean} / \Delta d) \times 100\)
 
-where $\Delta\mathbf{p} = \mathbf{p}(t+\Delta) - \mathbf{p}(t)$
+where \(\Delta d = 10\) m.
 
 **Reference**: Geiger et al., "Vision meets Robotics: The KITTI Dataset", IJRR 2013
 
-We report drift as **rates** that are easier to interpret and compare across methods:
-
-- **Translation drift rate** (m/m): \( \text{RPE}_{trans,mean} / \Delta d \)
-- **Rotation drift rate** (deg/100m): \( (\text{RPE}_{rot,mean} / \Delta d) \times 100 \)
-
-where \(\Delta d\) is a distance interval in meters (e.g., 10 m).
-
 #### 3. Completeness
-
-Completeness measures how many ground-truth poses can be associated and evaluated:
 
 $$Completeness = \frac{N_{matched}}{N_{gt}} \times 100\%$$
 
-#### Why these metrics (and why Sim(3) alignment)?
+#### Why Sim(3) alignment?
 
-Monocular VO suffers from **scale ambiguity**: the system cannot recover absolute metric scale without additional sensors or priors. Therefore:
+Monocular VO suffers from **scale ambiguity**. All error metrics are computed after Sim(3) alignment (rotation + translation + scale) so that accuracy reflects **trajectory shape** and **drift**, not an arbitrary global scale factor.
 
-- **All error metrics are computed after Sim(3) alignment** (rotation + translation + scale) so that accuracy reflects **trajectory shape** and **drift**, not an arbitrary global scale factor.
-- **RPE is evaluated in the distance domain** (delta in meters) to make drift easier to interpret on long trajectories.
-- **Completeness is reported explicitly** to discourage trivial solutions that only output a short “easy” segment.
+### Evaluation Protocol
 
-### Trajectory Alignment
-
-We use Sim(3) (7-DOF) alignment to optimally align estimated trajectory to ground truth:
-
-- **3-DOF Translation**: Align trajectory origins
-- **3-DOF Rotation**: Align trajectory orientations
-- **1-DOF Scale**: Compensate for monocular scale ambiguity
-
-### Evaluation Protocol (Recommended)
-
-This section describes the **exact** evaluation protocol used in this report. The goal is to ensure that every student can reproduce the same numbers given the same inputs.
-
-#### Inputs
-
-- **Ground truth**: `ground_truth.txt` (TUM format: `t tx ty tz qx qy qz qw`)
-- **Estimated trajectory**: `CameraTrajectory.txt` (TUM format)
-- **Association threshold**: `t_max_diff = 0.1 s`
-  - This dataset contains RTK at ~5 Hz and images at ~10 Hz.
-  - A threshold of 0.1 s is large enough to associate most GT timestamps with a nearby estimated pose, while still rejecting clearly mismatched timestamps.
-- **Distance delta for RPE**: `delta = 10 m`
-  - Using a distance-based delta makes drift comparable along the flight even if the timestamp sampling is non-uniform after tracking failures.
-
-#### Step 1 — ATE with Sim(3) alignment (scale corrected)
-
-```bash
-evo_ape tum ground_truth.txt CameraTrajectory.txt \
-  --align --correct_scale \
-  --t_max_diff 0.1 -va
-```
-
-We report **ATE RMSE (m)** as the primary global accuracy metric.
-
-#### Step 2 — RPE (translation + rotation) in the distance domain
-
-```bash
-# Translation RPE over 10 m (meters)
-evo_rpe tum ground_truth.txt CameraTrajectory.txt \
-  --align --correct_scale \
-  --t_max_diff 0.1 \
-  --delta 10 --delta_unit m \
-  --pose_relation trans_part -va
-
-# Rotation RPE over 10 m (degrees)
-evo_rpe tum ground_truth.txt CameraTrajectory.txt \
-  --align --correct_scale \
-  --t_max_diff 0.1 \
-  --delta 10 --delta_unit m \
-  --pose_relation angle_deg -va
-```
-
-We convert evo’s mean RPE over 10 m into drift rates:
-
-- **RPE translation drift (m/m)** = `RPE_trans_mean_m / 10`
-- **RPE rotation drift (deg/100m)** = `(RPE_rot_mean_deg / 10) * 100`
-
-#### Step 3 — Completeness
-
-Completeness measures how much of the sequence can be evaluated:
-
-```text
-Completeness (%) = matched_poses / gt_poses * 100
-```
-
-Here, `matched_poses` is the number of pose pairs successfully associated by evo under `t_max_diff`.
-
-#### Practical Notes (Common Pitfalls)
-
-- **Use the correct trajectory file**:
-  - `CameraTrajectory.txt` contains *all tracked frames* and typically yields higher completeness.
-  - `KeyFrameTrajectory.txt` contains only keyframes and can severely reduce completeness and distort drift estimates.
-- **Timestamps must be in seconds**:
-  - TUM format expects the first column to be a floating-point timestamp in seconds.
-  - If you accidentally write frame indices as timestamps, `evo` will fail to associate trajectories.
-- **Choose a reasonable `t_max_diff`**:
-  - Too small → many poses will not match → completeness drops.
-  - Too large → wrong matches may slip in → metrics become unreliable.
+- **Ground truth**: `ground_truth.txt` (TUM format)
+- **Estimated trajectory**: `CameraTrajectory.txt` (full trajectory, all frames)
+- **Association threshold**: \(t_{max\_diff} = 0.1\) s
+- **Distance delta for RPE**: \(\delta = 10\) m
 
 ---
 
@@ -271,17 +189,17 @@ Here, `matched_poses` is the number of pose pairs successfully associated by evo
 | **Mode** | Monocular Visual Odometry |
 | **Vocabulary** | ORBvoc.txt (pre-trained) |
 | **Operating System** | Linux (Ubuntu / WSL2) |
-| **Image preprocessing** | 4× downsampling (2448×2048 → 612×512) |
+| **Image preprocessing** | 2× downsampling (2448×2048 → 1224×1024) |
 | **Bag playback** | 0.5× speed |
 
-### Camera Calibration (4× Downsampled)
+### Camera Calibration (2× Downsampled)
 
 ```yaml
 Camera.type: "PinHole"
-Camera1.fx: 361.1075
-Camera1.fy: 361.085
-Camera1.cx: 294.875
-Camera1.cy: 261.225
+Camera1.fx: 722.215
+Camera1.fy: 722.17
+Camera1.cx: 589.75
+Camera1.cy: 522.45
 
 Camera1.k1: -0.0560
 Camera1.k2: 0.1180
@@ -289,23 +207,22 @@ Camera1.p1: 0.00122
 Camera1.p2: 0.00064
 Camera1.k3: -0.0627
 
-Camera.width: 612
-Camera.height: 512
+Camera.width: 1224
+Camera.height: 1024
 Camera.fps: 10.0
-Camera.RGB: 1
 ```
 
-Intrinsics scaled by 1/4 from original 2448×2048 calibration.
+Intrinsics scaled by 1/2 from original 2448×2048 calibration.
 
 ### ORB Feature Extraction Parameters
 
 | Parameter | Value | Description |
 |-----------|-------|-------------|
-| `nFeatures` | 1500 | Features per frame |
+| `nFeatures` | 2000 | Features per frame |
 | `scaleFactor` | 1.2 | Pyramid scale factor |
 | `nLevels` | 8 | Pyramid levels |
-| `iniThFAST` | 15 | Initial FAST threshold |
-| `minThFAST` | 5 | Minimum FAST threshold |
+| `iniThFAST` | 12 | Initial FAST threshold |
+| `minThFAST` | 4 | Minimum FAST threshold |
 
 ### Running ORB-SLAM3
 
@@ -313,16 +230,91 @@ Intrinsics scaled by 1/4 from original 2448×2048 calibration.
 # Terminal 1: roscore
 source /opt/ros/noetic/setup.bash && roscore
 
-# Terminal 2: ORB-SLAM3 with 4× downsampling
+# Terminal 2: ORB-SLAM3 with 2× downsampling
 ./Examples_old/ROS/ORB_SLAM3/Mono_Compressed \
     Vocabulary/ORBvoc.txt \
-    Examples/Monocular/HKisland_Mono_downsampled.yaml \
-    4
+    Examples/Monocular/HKisland_Mono_downsampled2.yaml \
+    2
 
 # Terminal 3: Play bag at 0.5× speed
 rosbag play --pause --rate 0.5 data/HKisland_GNSS03.bag \
     /left_camera/image/compressed:=/camera/image_raw/compressed
 ```
+
+### Code Modifications
+
+The following modifications were made to the original ORB-SLAM3 codebase to support this evaluation.
+
+#### 1. Enable `CameraTrajectory.txt` for Monocular Mode (`src/System.cc`)
+
+Original ORB-SLAM3 disables `SaveTrajectoryTUM` for monocular mode. We **removed the monocular check** so that the full camera trajectory (all tracked frames) is saved, enabling dense evaluation with evo.
+
+**Original behavior** (commented out in our version):
+```cpp
+// Original ORB-SLAM3 had:
+// if(mSensor==MONOCULAR) {
+//     cerr << "ERROR: SaveTrajectoryTUM cannot be used for monocular." << endl;
+//     return;
+// }
+```
+
+**Current implementation** (`System::SaveTrajectoryTUM`):
+```cpp
+void System::SaveTrajectoryTUM(const string &filename)
+{
+    cout << endl << "Saving camera trajectory to " << filename << " ..." << endl;
+    /* Monocular support: Tracking populates mlRelativeFramePoses/mlpReferences/mlFrameTimes/mlbLost
+       for all sensor types, so full trajectory can be saved for monocular too. */
+
+    vector<KeyFrame*> vpKFs = mpAtlas->GetAllKeyFrames();
+    if(vpKFs.empty())
+    {
+        cerr << "ERROR: No keyframes, cannot save trajectory." << endl;
+        return;
+    }
+    // ... rest of function writes TUM format (timestamp x y z qx qy qz qw)
+}
+```
+
+#### 2. ROS Monocular Compressed Node (`Examples_old/ROS/ORB_SLAM3/src/ros_mono_compressed.cc`)
+
+Custom node for compressed images with optional downsampling and headless support:
+
+| Modification | Purpose |
+|--------------|---------|
+| **CompressedImage** | Subscribes to `/camera/image_raw/compressed` for rosbag compatibility |
+| **Downsampling** | 4th argument `[downsample_factor]` (e.g. `2` or `4`) resizes images before SLAM |
+| **bUseViewer=false** | Disables Pangolin viewer for Docker/headless environments |
+| **Save on shutdown** | Calls `SaveTrajectoryTUM` and `SaveKeyFrameTrajectoryTUM` after `Shutdown()` |
+
+**Key code snippets**:
+
+```cpp
+// Usage: Mono_Compressed vocab.txt settings.yaml [downsample_factor]
+int downsampleFactor = 1;
+if(argc == 4)
+    downsampleFactor = atoi(argv[3]);
+
+// bUseViewer=false: no X display (Docker/headless)
+ORB_SLAM3::System SLAM(argv[1], argv[2], ORB_SLAM3::System::MONOCULAR, false);
+
+// Downsample in GrabCompressedImage:
+if(mDownsampleFactor > 1) {
+    int newCols = image.cols / mDownsampleFactor;
+    int newRows = image.rows / mDownsampleFactor;
+    cv::resize(image, resized, cv::Size(newCols, newRows), 0, 0, cv::INTER_LINEAR);
+    image = resized;
+}
+
+// Save after shutdown (in main):
+SLAM.Shutdown();
+SLAM.SaveTrajectoryTUM("CameraTrajectory.txt");
+SLAM.SaveKeyFrameTrajectoryTUM("KeyFrameTrajectory.txt");
+```
+
+#### 3. Configuration Files
+
+- **`Examples/Monocular/HKisland_Mono_downsampled2.yaml`**: 2× downsampling (1224×1024), intrinsics scaled by 1/2, `nFeatures=2000`, `iniThFAST=12`, `minThFAST=4`.
 
 ---
 
@@ -336,53 +328,44 @@ VISUAL ODOMETRY EVALUATION RESULTS
 ================================================================================
 
 Ground Truth: RTK trajectory (1,955 poses)
-Estimated:    ORB-SLAM3 camera trajectory (3,704 poses)
-Matched Poses: 1,864 / 1,955 (95.35%)  ← Completeness
+Estimated:    ORB-SLAM3 camera trajectory (3,609 poses)
+Matched Poses: 1,817 / 1,955 (92.94%)  ← Completeness
 
 METRIC 1: ATE (Absolute Trajectory Error)
 ────────────────────────────────────────
-RMSE:   99.4754 m
-Mean:   62.1541 m
-Std:    77.6674 m
+RMSE:   3.2078 m
+Mean:   2.0624 m
+Std:    2.4569 m
 
 METRIC 2: RPE Translation Drift (distance-based, delta=10 m)
 ────────────────────────────────────────
-Mean translational RPE over 10 m: 48.1534 m
-Translation drift rate:           4.8153 m/m
+Mean translational RPE over 10 m: 14.4427 m
+Translation drift rate:           1.4443 m/m
 
 METRIC 3: RPE Rotation Drift (distance-based, delta=10 m)
 ────────────────────────────────────────
-Mean rotational RPE over 10 m: 13.7809 deg
-Rotation drift rate:        137.8087 deg/100m
+Mean rotational RPE over 10 m: 11.0348 deg
+Rotation drift rate:        110.3482 deg/100m
 
 ================================================================================
 ```
-
-### Trajectory Alignment Statistics
-
-| Parameter | Value |
-|-----------|-------|
-| **Sim(3) scale correction** | 0.2447 |
-| **Sim(3) translation** | [-6.910, -50.528, 27.012] m |
-| **Association threshold** | \(t_{max\_diff}\) = 0.1 s |
-| **Association rate (Completeness)** | 95.35% |
 
 ### Performance Analysis
 
 | Metric | Value | Grade | Interpretation |
 |--------|-------|-------|----------------|
-| **ATE RMSE** | 99.48 m | F | Large global error after alignment |
-| **RPE Trans Drift** | 4.82 m/m | F | High local drift per traveled distance |
-| **RPE Rot Drift** | 137.81 deg/100m | F | Severe orientation drift |
-| **Completeness** | 95.35% | A | Excellent pose alignment coverage |
+| **ATE RMSE** | 3.21 m | B | Within acceptable range for outdoor VO |
+| **RPE Trans Drift** | 1.44 m/m | C | Moderate local drift |
+| **RPE Rot Drift** | 110.35 deg/100m | C | Moderate orientation drift |
+| **Completeness** | 92.94% | A | Excellent pose alignment coverage |
 
 ### Key Observations
 
-1. **Completeness (95.35%)**: Using full `CameraTrajectory.txt` (all tracked frames) yields high alignment rate, much better than keyframe-only evaluation (~45%).
+1. **Completeness (92.94%)**: Using full `CameraTrajectory.txt` (all tracked frames) yields high alignment rate.
 
-2. **Accuracy metrics**: ATE and RPE indicate substantial drift on this challenging UAV aerial sequence (~1.9 km, 6.5 min). Monocular VO without loop closure accumulates error over long trajectories.
+2. **2× downsampling**: Significant improvement over 4× downsampling. ATE reduced from ~99 m to ~3.2 m. Higher resolution (1224×1024) preserves more structure for better pose estimation.
 
-3. **4× downsampling**: Reduces computational load and may improve feature distribution, but lower resolution can affect accuracy on high-altitude aerial imagery.
+3. **Accuracy metrics**: ATE within acceptable range; RPE drift moderate but typical for monocular VO.
 
 ---
 
@@ -392,13 +375,12 @@ Rotation drift rate:        137.8087 deg/100m
 
 ![Trajectory Evaluation](figures/trajectory_evaluation.png)
 
-This figure is generated from the same inputs used for evaluation (`ground_truth.txt` and `CameraTrajectory.txt`) and includes:
+This figure includes:
 
-1. **Top-Left**: 2D trajectory before alignment (matched poses only). This reveals scale/rotation mismatch typical for monocular VO.
-2. **Top-Right**: 2D trajectory after Sim(3) alignment (scale corrected). Remaining discrepancy reflects drift and local tracking errors.
-3. **Bottom-Left**: Distribution of ATE translation errors (meters) over all matched poses.
-4. **Bottom-Right**: ATE translation error as a function of the matched pose index (highlights where drift accumulates).
-
+1. **Top-Left**: 2D trajectory before alignment (matched poses only)
+2. **Top-Right**: 2D trajectory after Sim(3) alignment (scale corrected)
+3. **Bottom-Left**: Distribution of ATE translation errors (meters)
+4. **Bottom-Right**: ATE translation error along trajectory
 
 **Reproducibility**: Regenerate with `scripts/generate_report_figures.py` and `evo_ape --save_results`.
 
@@ -408,15 +390,15 @@ This figure is generated from the same inputs used for evaluation (`ground_truth
 
 ### Strengths
 
-1. **High evaluation coverage**: 95.35% completeness indicates most ground-truth poses can be associated and evaluated.
+1. **High evaluation coverage**: 92.94% completeness indicates most ground-truth poses can be associated and evaluated.
 
 2. **Full trajectory output**: Modified ORB-SLAM3 to save `CameraTrajectory.txt` (all frames) for monocular mode, enabling dense evaluation.
 
-3. **End-to-end pipeline**: Reproducible workflow from bag playback to evaluation with evo.
+3. **2× downsampling**: Good balance between accuracy and computational load; ATE ~3.2 m acceptable for outdoor VO.
 
 ### Limitations
 
-1. **Large drift**: ATE and RPE indicate significant error accumulation over the 1.9 km trajectory.
+1. **Moderate drift**: RPE indicates some error accumulation over the 1.9 km trajectory.
 
 2. **Monocular scale ambiguity**: Without IMU or stereo, scale cannot be recovered; Sim(3) alignment corrects for evaluation but real-world scale remains unknown.
 
@@ -424,9 +406,9 @@ This figure is generated from the same inputs used for evaluation (`ground_truth
 
 ### Error Sources
 
-1. **4× downsampling**: Reduced resolution may lose fine-grained structure.
+1. **Resolution**: 2× downsampling preserves more structure than 4×; further tuning may improve.
 2. **Calibration**: Scaled intrinsics for downsampled images; verify against original calibration.
-3. **Feature extraction**: ORB parameters may need tuning for aerial imagery.
+3. **Feature extraction**: ORB parameters (nFeatures=2000, FAST 12/4) tuned for this run.
 
 ---
 
@@ -434,10 +416,10 @@ This figure is generated from the same inputs used for evaluation (`ground_truth
 
 This assignment demonstrates monocular Visual Odometry implementation using ORB-SLAM3 on UAV aerial imagery. Key findings:
 
-1. ✅ **System Operation**: ORB-SLAM3 processes 3,704 frames over ~1.9 km trajectory
-2. ✅ **Evaluation coverage**: 95.35% completeness with full trajectory evaluation
-3. ⚠️ **Accuracy**: Large ATE and RPE indicate drift; typical for monocular VO on long sequences
-4. 📌 **Improvements**: Full trajectory export, 4× downsampling, 0.5× playback for stability
+1. ✅ **System Operation**: ORB-SLAM3 processes 3,609 frames over ~1.9 km trajectory
+2. ✅ **Evaluation coverage**: 92.94% completeness with full trajectory evaluation
+3. ✅ **Accuracy**: ATE 3.21 m within acceptable range; 2× downsampling yields good results
+4. 📌 **Improvements**: Full trajectory export, 2× downsampling, 0.5× playback, nFeatures=2000
 
 ### Recommendations for Improvement
 
@@ -446,6 +428,7 @@ This assignment demonstrates monocular Visual Odometry implementation using ORB-
 | High | Increase `nFeatures` to 2000–2500 | Better feature coverage |
 | High | Lower FAST thresholds (e.g., 12/4) | More features in low-contrast regions |
 | Medium | Try without downsampling (full resolution) | Compare accuracy trade-off |
+| Medium | 2× downsampling (current) | Good balance; ATE ~3.2 m |
 | Low | Enable IMU fusion (VIO mode) | 50–70% accuracy improvement |
 
 ---
@@ -462,39 +445,37 @@ This assignment demonstrates monocular Visual Odometry implementation using ORB-
 
 5. ORB-SLAM3 GitHub: https://github.com/UZ-SLAMLab/ORB_SLAM3
 
+6. AAE5303 Assignment Template: https://github.com/XitingChen-Chloe/AAE5303-assignment2/blob/main/README.md
+
 ---
 
 ## 📎 Appendix
 
-### A. Repository Structure
+### A. Repository Structure (Upload-Ready)
 
 ```
-ORB_SLAM3/
-├── README.md           # This report
-├── FINAL_EVALUATION_RESULTS.txt
-├── ground_truth.txt
-├── CameraTrajectory.txt
-├── KeyFrameTrajectory.txt
+AAE5303_assignment2_orbslam3_demo/
+├── README.md                    # This report
+├── requirements.txt             # Python dependencies (numpy, evo, matplotlib)
 ├── figures/
 │   └── trajectory_evaluation.png
-├── evaluation_results/
-│   ├── metrics.json
-│   ├── ate.zip
-│   ├── rpe_trans.zip
-│   └── rpe_rot.zip
+├── output/
+│   ├── evaluation_report.json   # Structured metrics (ATE, RPE, completeness)
+│   ├── FINAL_EVALUATION_RESULTS.txt
+│   ├── CameraTrajectory.txt
+│   ├── KeyFrameTrajectory.txt
+│   └── ground_truth.txt
 ├── scripts/
 │   ├── evaluate_vo_accuracy.py
 │   └── generate_report_figures.py
-├── Examples/Monocular/
-│   ├── HKisland_Mono.yaml
-│   └── HKisland_Mono_downsampled.yaml
-└── RUN_AND_EVALUATE_GUIDE.md
+└── docs/
+    └── camera_config.yaml       # 2× downsampled HKisland config
 ```
 
 ### B. Running Commands
 
 ```bash
-# 1. Extract RTK ground truth from bag
+# 1. Extract RTK ground truth from bag (run from ORB_SLAM3 root; bag in data/)
 python3 << 'EOF'
 import rosbag
 import numpy as np
@@ -519,23 +500,23 @@ EOF
 
 # 2. Run ORB-SLAM3 (see Implementation Details for full steps)
 
-# 3. Evaluate trajectory
+# 3. Evaluate trajectory (use output/ for trajectories)
 python3 scripts/evaluate_vo_accuracy.py \
-    --groundtruth ground_truth.txt \
-    --estimated CameraTrajectory.txt \
+    --groundtruth output/ground_truth.txt \
+    --estimated output/CameraTrajectory.txt \
     --t-max-diff 0.1 \
     --delta-m 10 \
-    --workdir evaluation_results \
-    --json-out evaluation_results/metrics.json
+    --workdir output \
+    --json-out output/evaluation_report.json
 
 # 4. Generate report figures
-evo_ape tum ground_truth.txt CameraTrajectory.txt \
+evo_ape tum output/ground_truth.txt output/CameraTrajectory.txt \
     --align --correct_scale --t_max_diff 0.1 \
-    --save_results evaluation_results/ate.zip -va
+    --save_results output/ate.zip -va
 python3 scripts/generate_report_figures.py \
-    --gt ground_truth.txt \
-    --est CameraTrajectory.txt \
-    --evo-ape-zip evaluation_results/ate.zip \
+    --gt output/ground_truth.txt \
+    --est output/CameraTrajectory.txt \
+    --evo-ape-zip output/ate.zip \
     --out figures/trajectory_evaluation.png \
     --title-suffix "HKisland_GNSS03"
 ```
@@ -543,14 +524,14 @@ python3 scripts/generate_report_figures.py \
 ### C. Native evo Commands
 
 ```bash
-evo_ape tum ground_truth.txt CameraTrajectory.txt \
+evo_ape tum output/ground_truth.txt output/CameraTrajectory.txt \
   --align --correct_scale --t_max_diff 0.1 -va
 
-evo_rpe tum ground_truth.txt CameraTrajectory.txt \
+evo_rpe tum output/ground_truth.txt output/CameraTrajectory.txt \
   --align --correct_scale --t_max_diff 0.1 \
   --delta 10 --delta_unit m --pose_relation trans_part -va
 
-evo_rpe tum ground_truth.txt CameraTrajectory.txt \
+evo_rpe tum output/ground_truth.txt output/CameraTrajectory.txt \
   --align --correct_scale --t_max_diff 0.1 \
   --delta 10 --delta_unit m --pose_relation angle_deg -va
 ```

@@ -1,0 +1,4 @@
+# Python dependencies for AAE5303 VO evaluation
+numpy>=1.19.0
+evo>=1.12.0
+matplotlib>=3.3.0
